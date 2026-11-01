@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">StudentHub</string>
+    <string name="empty_courses">Aucun produit dans la liste de courses.</string>
+    <string name="empty_recipes">Aucune recette disponible.</string>
+    <string name="empty_recommendations">Aucune suggestion ne correspond à ces filtres.</string>
+    <string name="empty_tasks">Aucune échéance pour le moment.</string>
+    <string name="empty_transactions">Aucune opération enregistrée.</string>
+    <string name="invalid_amount">Saisis un montant positif valide.</string>
+    <string name="invalid_product">Saisis un nom, une quantité et un prix valides.</string>
+    <string name="invalid_recipe">Vérifie le nom, le temps, le nombre de portions et les ingrédients.</string>
+    <string name="invalid_date">Choisis une date valide.</string>
+    <string name="invalid_goal">Saisis un montant positif ou nul.</string>
+    <string name="empty_upcoming_tasks">Rien à rendre, profites-en !</string>
+    <string name="scan_barcode_description">Scanner un code-barres</string>
+    <string name="delete_description">Supprimer</string>
+    <string name="hide_balance_description">Masquer le solde</string>
+    <string name="show_balance_description">Afficher le solde</string>
+    <string name="add_operation_description">Ajouter une opération</string>
+    <string name="empty_icon_description">Liste vide</string>
+</resources>
