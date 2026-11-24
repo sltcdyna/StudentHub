@@ -1,6 +1,7 @@
 package com.dyna.studenthub.ui.screen
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,7 +23,14 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,13 +46,16 @@ import com.dyna.studenthub.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dyna.studenthub.data.local.TaskType
 import com.dyna.studenthub.domain.HomeCalculations
+import com.dyna.studenthub.domain.Money
 import com.dyna.studenthub.viewmodel.HomeViewModel
 import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
-private val Blue = Color(0xFF4F7CF0)
-private val Green = Color(0xFF1FB57A)
-private val Coral = Color(0xFFF26B5B)
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.text.style.TextOverflow
+
 private fun euros(cents: Long) = NumberFormat.getCurrencyInstance(Locale.FRANCE).format(cents / 100.0)
 
 @Composable
@@ -52,12 +63,18 @@ fun HomeScreen(
     onStudiesClick: () -> Unit,
     onMoneyClick: () -> Unit,
     onMealsClick: () -> Unit,
+    onProfileClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
     var goalDialog by rememberSaveable { mutableStateOf(false) }
     var nameDialog by rememberSaveable { mutableStateOf(false) }
-    if (!state.loading && state.firstName.isBlank()) nameDialog = true
+
+    LaunchedEffect(state.loading, state.firstName) {
+        if (!state.loading && state.firstName.isBlank()) {
+            nameDialog = true
+        }
+    }
     LazyColumn(
         Modifier.fillMaxSize().padding(horizontal = 16.dp).imePadding(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 96.dp),
@@ -65,25 +82,85 @@ fun HomeScreen(
         userScrollEnabled = true,
     ) {
         item {
-            Text(if (state.firstName.isBlank()) "Bonjour 👋" else "Bonjour ${state.firstName} 👋", style = MaterialTheme.typography.headlineMedium)
-            Text("Bonne journée ! Tu gères !", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        SimpleDateFormat("EEEE d MMMM", Locale.FRANCE).format(Date())
+                            .replaceFirstChar { it.uppercase(Locale.FRANCE) },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                    Text(
+                        if (state.firstName.isBlank()) "Bonjour 👋" else "Bonjour ${state.firstName} 👋",
+                        style = MaterialTheme.typography.headlineMedium,
+                    )
+                    Text("Une journée à la fois, tu avances.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(
+                    onClick = onProfileClick,
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(18.dp)),
+                ) {
+                    Icon(
+                        Icons.Rounded.Person,
+                        contentDescription = "Ouvrir mon profil",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
+            }
         }
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryCard("Devoirs / examens", "${state.upcomingTasks.size}", "7 prochains jours", Blue, onStudiesClick, Modifier.weight(1f))
-                SummaryCard("Solde disponible", euros(state.balanceCents), "", Green, onMoneyClick, Modifier.weight(1f))
-                SummaryCard("Budget repas restant", euros(state.foodBudgetRemainingCents), "", Coral, onMealsClick, Modifier.weight(1f))
+            CompanionView(
+                mood = state.companionMood,
+                message = state.companionMessage,
+                companionId = state.companionId,
+                companionName = state.companionName,
+            )
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SummaryCard("Solde disponible", euros(state.balanceCents), "", MaterialTheme.colorScheme.secondary, onMoneyClick, Modifier.weight(1f))
+                    SummaryCard("Budget repas", euros(state.foodBudgetRemainingCents), "restant", MaterialTheme.colorScheme.secondary, onMealsClick, Modifier.weight(1f))
+                }
+                SummaryCard(
+                    "Devoirs et examens à venir",
+                    "${state.upcomingTasks.size}",
+                    "échéances non terminées",
+                    MaterialTheme.colorScheme.secondary,
+                    onStudiesClick,
+                    Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Accès rapide", style = MaterialTheme.typography.titleLarge)
+                    Text("Tes essentiels", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DashboardShortcut("Études", Icons.AutoMirrored.Rounded.MenuBook, MaterialTheme.colorScheme.primaryContainer, onStudiesClick, Modifier.weight(1f))
+                    DashboardShortcut("Budget", Icons.Rounded.AccountBalanceWallet, MaterialTheme.colorScheme.tertiaryContainer, onMoneyClick, Modifier.weight(1f))
+                    DashboardShortcut("Repas", Icons.Rounded.Restaurant, MaterialTheme.colorScheme.secondaryContainer, onMealsClick, Modifier.weight(1f))
+                }
             }
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Prochains devoirs", style = MaterialTheme.typography.titleLarge)
+                Text("Prochaines échéances", style = MaterialTheme.typography.titleLarge)
                 TextButton(onClick = onStudiesClick) { Text("Voir tout") }
             }
         }
-        if (state.upcomingTasks.isEmpty()) item { EmptyState(stringResource(R.string.empty_upcoming_tasks)) }
-        items(state.upcomingTasks.take(2), key = { it.id }) { task ->
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+        if (state.upcomingTasks.isEmpty()) item {
+            EmptyState(stringResource(R.string.empty_upcoming_tasks))
+        }
+        items(state.upcomingTasks.take(3), key = { it.id }) { task ->
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(14.dp)) {
                     Text(task.title, style = MaterialTheme.typography.titleMedium)
                     Text("${if (task.type == TaskType.EXAM) "Examen" else "Devoir"} · ${task.subject}")
@@ -91,7 +168,7 @@ fun HomeScreen(
             }
         }
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFE6F7EF))) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                 Column(Modifier.padding(16.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Mes objectifs", style = MaterialTheme.typography.titleLarge)
@@ -99,18 +176,18 @@ fun HomeScreen(
                     }
                     Text("Objectif épargne mensuel : ${euros(state.savingsGoalCents)}")
                     Spacer(Modifier.height(8.dp))
-                    LinearProgressIndicator(
+                        LinearProgressIndicator(
                         progress = { HomeCalculations.objectiveProgress(state.balanceCents, state.savingsGoalCents) },
                         modifier = Modifier.fillMaxWidth(),
-                        color = Green,
+                        color = MaterialTheme.colorScheme.secondary,
                     )
                     Text("${(HomeCalculations.objectiveProgress(state.balanceCents, state.savingsGoalCents) * 100).toInt()} % atteint")
                 }
             }
         }
         if (state.exceededCategories.isNotEmpty()) item {
-            Card(onClick = onMoneyClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFFFDECEC))) {
-                Text("Attention : ${state.exceededCategories.joinToString()} dépasse 80 % du plafond.", Modifier.padding(16.dp), color = Color(0xFFE5484D))
+            Card(onClick = onMoneyClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                Text("Attention : ${state.exceededCategories.joinToString()} dépasse 80 % du plafond.", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -121,7 +198,13 @@ fun HomeScreen(
             title = { Text("Bienvenue sur StudentHub") },
             text = {
                 Column(Modifier.imePadding().verticalScroll(rememberScrollState())) {
-                    OutlinedTextField(name, { name = it }, label = { Text("Ton prénom") }, singleLine = true)
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Ton prénom") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             },
             confirmButton = { Button(enabled = name.isNotBlank(), onClick = { viewModel.saveFirstName(name); nameDialog = false }) { Text("Commencer") } },
@@ -131,12 +214,37 @@ fun HomeScreen(
 }
 
 @Composable
+private fun DashboardShortcut(
+    label: String,
+    icon: ImageVector,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = .72f)),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 13.dp, horizontal = 8.dp),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+@Composable
 private fun SummaryCard(title: String, value: String, subtitle: String, color: Color, onClick: () -> Unit, modifier: Modifier) {
     Card(onClick = onClick, modifier = modifier, shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = color.copy(alpha = .12f))) {
         Column(Modifier.padding(10.dp)) {
-            Text(title, style = MaterialTheme.typography.labelMedium)
-            Text(value, style = MaterialTheme.typography.titleMedium, color = color)
-            if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelSmall)
+            Text(title, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(value, style = MaterialTheme.typography.titleLarge, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -150,15 +258,21 @@ private fun GoalDialog(current: Long, onDismiss: () -> Unit, onSave: (Long) -> U
         title = { Text("Objectif mensuel") },
         text = {
             Column(Modifier.imePadding().verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value, { value = it }, label = { Text("Montant en euros") }, singleLine = true)
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    label = { Text("Montant en euros") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = { TextButton(onClick = {
-            val parsed = value.replace(',', '.').toDoubleOrNull()
-            if (parsed == null || parsed < 0) {
+            val parsed = Money.parseEuroToCents(value)
+            if (parsed == null) {
                 error = true
             } else {
-                onSave((parsed * 100).toLong())
+                onSave(parsed)
                 onDismiss()
             }
         }) { Text("Enregistrer") } },

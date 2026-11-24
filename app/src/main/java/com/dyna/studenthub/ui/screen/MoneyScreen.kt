@@ -2,6 +2,8 @@ package com.dyna.studenthub.ui.screen
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -26,14 +29,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.dyna.studenthub.R
 import com.dyna.studenthub.data.local.Transaction
 import com.dyna.studenthub.data.local.TransactionType
+import com.dyna.studenthub.domain.Money
+import com.dyna.studenthub.domain.TaskCalculations
 import com.dyna.studenthub.viewmodel.MoneyViewModel
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Green = Color(0xFF2E7D5B)
-private val Categories = listOf("Alimentation", "Logement", "Transport", "Loisirs", "Autres")
+private val ExpenseCategories = listOf("Alimentation", "Logement", "Transport", "Loisirs", "Autres")
+private val RevenueCategories = listOf("Salaire", "APL / Aides", "Autres revenus")
 private fun euros(cents: Long): String = NumberFormat.getCurrencyInstance(Locale.FRANCE).format(cents / 100.0)
 
 @Composable
@@ -42,13 +47,14 @@ fun MoneyScreen(viewModel: MoneyViewModel = hiltViewModel()) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showBalance by rememberSaveable { mutableStateOf(true) }
     var dialog by rememberSaveable { mutableStateOf(false) }
+    var transactionToDelete by remember { mutableStateOf<Transaction?>(null) }
     val visible = when (tab) {
         1 -> state.transactions.filter { it.type == TransactionType.EXPENSE }
         2 -> state.transactions.filter { it.type == TransactionType.REVENUE }
         else -> state.transactions
     }
     Scaffold(floatingActionButton = {
-        FloatingActionButton(onClick = { dialog = true }, containerColor = Green, contentColor = Color.White) {
+        FloatingActionButton(onClick = { dialog = true }, containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
             Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.add_operation_description))
         }
     }) { padding ->
@@ -59,35 +65,51 @@ fun MoneyScreen(viewModel: MoneyViewModel = hiltViewModel()) {
             userScrollEnabled = true,
         ) {
             item {
-                Text("Argent", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 12.dp))
+                Column(Modifier.padding(top = 8.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Mon argent", style = MaterialTheme.typography.headlineMedium)
+                    Text("Un budget plus clair, sans prise de tête.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 TabRow(selectedTabIndex = tab) {
                     listOf("Vue d'ensemble", "Dépenses", "Revenus").forEachIndexed { index, title ->
-                        Tab(index == tab, { tab = index }, text = { Text(title) })
+                        Tab(
+                            selected = index == tab,
+                            onClick = { tab = index },
+                            selectedContentColor = MaterialTheme.colorScheme.secondary,
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = { Text(title) },
+                        )
                     }
                 }
             }
             item {
-                Card(colors = CardDefaults.cardColors(containerColor = Green), shape = RoundedCornerShape(20.dp)) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = RoundedCornerShape(24.dp),
+                ) {
                     Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Solde disponible", color = Color.White.copy(alpha = .8f))
-                            Text(if (showBalance) euros(state.balanceCents) else "••••", color = Color.White, style = MaterialTheme.typography.headlineLarge)
+                            Text("Solde disponible", color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .78f))
+                            Text(
+                                if (showBalance) euros(state.balanceCents) else "••••",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                style = MaterialTheme.typography.headlineLarge,
+                            )
                         }
                         IconButton({ showBalance = !showBalance }) {
                             Icon(
                                 if (showBalance) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
                                 if (showBalance) stringResource(R.string.hide_balance_description) else stringResource(R.string.show_balance_description),
-                                tint = Color.White,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             )
                         }
                     }
                 }
             }
             item {
-                Card {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("Budget hebdo recommandé", style = MaterialTheme.typography.titleMedium)
-                        Text("${euros(state.weeklyBudgetCents)} / semaine", style = MaterialTheme.typography.headlineSmall, color = Green)
+                        Text("Ton repère pour la semaine", style = MaterialTheme.typography.titleMedium)
+                        Text("${euros(state.weeklyBudgetCents)} / semaine", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.secondary)
                     }
                 }
             }
@@ -96,25 +118,38 @@ fun MoneyScreen(viewModel: MoneyViewModel = hiltViewModel()) {
             }
             if (state.exceededCategories.isNotEmpty()) {
                 item {
-                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE4E1))) {
-                        Text("Attention : ${state.exceededCategories.joinToString()} dépasse 80% du plafond.", Modifier.padding(16.dp), color = Color(0xFF9B2C2C))
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                        Text("Attention : ${state.exceededCategories.joinToString()} dépasse 80% du plafond.", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
             if (tab == 0) {
-                item { TransactionSection("Mes revenus", state.transactions.filter { it.type == TransactionType.REVENUE }) }
-                item { TransactionSection("Mes dépenses", state.transactions.filter { it.type == TransactionType.EXPENSE }) }
+                item { TransactionSection("Derniers revenus", state.transactions.filter { it.type == TransactionType.REVENUE }.take(4), { transactionToDelete = it }) }
+                item { TransactionSection("Dernières dépenses", state.transactions.filter { it.type == TransactionType.EXPENSE }.take(5), { transactionToDelete = it }) }
             } else {
-                val sectionType = if (tab == 2) TransactionType.REVENUE else TransactionType.EXPENSE
-                item { TransactionSection(if (tab == 2) "Mes revenus" else "Mes dépenses", visible) }
+                item { TransactionSection(if (tab == 2) "Mes revenus" else "Mes dépenses", visible, { transactionToDelete = it }) }
             }
         }
     }
     if (dialog) AddTransactionDialog({ dialog = false }, viewModel::addTransaction)
+    transactionToDelete?.let { transaction ->
+        AlertDialog(
+            onDismissRequest = { transactionToDelete = null },
+            title = { Text("Supprimer cette opération ?") },
+            text = { Text("${transaction.label} · ${euros(transaction.amountCents)}") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteTransaction(transaction)
+                    transactionToDelete = null
+                }) { Text("Supprimer") }
+            },
+            dismissButton = { TextButton(onClick = { transactionToDelete = null }) { Text("Annuler") } },
+        )
+    }
 }
 
 @Composable
-private fun TransactionSection(title: String, transactions: List<Transaction>) {
+private fun TransactionSection(title: String, transactions: List<Transaction>, onDelete: (Transaction) -> Unit) {
     Column(
         Modifier.imePadding(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -125,32 +160,33 @@ private fun TransactionSection(title: String, transactions: List<Transaction>) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge)
-            Text(euros(transactions.sumOf { it.amountCents }), color = Green)
+            Text(euros(transactions.sumOf { it.amountCents }), color = MaterialTheme.colorScheme.secondary)
         }
         if (transactions.isEmpty()) {
             EmptyState(stringResource(R.string.empty_transactions))
         } else {
-            transactions.forEach { TransactionRow(it) }
+            transactions.forEach { transaction -> TransactionRow(transaction, { onDelete(transaction) }) }
         }
     }
 }
 
-@Composable private fun TransactionRow(transaction: Transaction) {
+@Composable private fun TransactionRow(transaction: Transaction, onDelete: () -> Unit) {
     val positive = transaction.type == TransactionType.REVENUE
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(40.dp).background(if (positive) Color(0xFFDDF3E8) else Color(0xFFFFE4E1), RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
-            Text(if (positive) "↗" else "↘", color = if (positive) Green else Color(0xFFC44D58))
+        Box(Modifier.size(40.dp).background(if (positive) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
+            Text(if (positive) "↗" else "↘", color = if (positive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error)
         }
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(transaction.label); Text(transaction.category, style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
-        Text("${if (positive) "+" else "-"}${euros(transaction.amountCents)}", color = if (positive) Green else MaterialTheme.colorScheme.onSurface)
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) { Text(transaction.label); Text(transaction.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Text("${if (positive) "+" else "-"}${euros(transaction.amountCents)}", color = if (positive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface)
+        IconButton(onClick = onDelete) { Icon(Icons.Rounded.Delete, contentDescription = "Supprimer ${transaction.label}", tint = MaterialTheme.colorScheme.error) }
     }
 }
 
 @Composable private fun SpendingChart(totals: Map<String, Long>) {
-    val colors = listOf(Color(0xFF2E7D5B), Color(0xFFE39B44), Color(0xFF5B8DEF), Color(0xFFB56BD5), Color(0xFFCC5B5B))
+    val colors = listOf(MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.onSurfaceVariant)
     val total = totals.values.sum()
     if (total == 0L) return
-    Card {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp)) {
             Text("Répartition des dépenses", style = MaterialTheme.typography.titleMedium)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -170,46 +206,85 @@ private fun TransactionSection(title: String, transactions: List<Transaction>) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AddTransactionDialog(
     onDismiss: () -> Unit,
     onAdd: (TransactionType, String, String, Long, Long) -> Unit,
 ) {
     var type by rememberSaveable { mutableStateOf(TransactionType.EXPENSE) }
-    var category by rememberSaveable { mutableStateOf(Categories.first()) }
+    var category by rememberSaveable { mutableStateOf(ExpenseCategories.first()) }
     var label by rememberSaveable { mutableStateOf("") }
     var amount by rememberSaveable { mutableStateOf("") }
     var dateMillis by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf(false) }
     val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE) }
+
+    val currentCategories = if (type == TransactionType.EXPENSE) ExpenseCategories else RevenueCategories
+
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Ajouter une opération") }, text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row { FilterChip(type == TransactionType.EXPENSE, { type = TransactionType.EXPENSE }, { Text("Dépense") }); Spacer(Modifier.width(8.dp)); FilterChip(type == TransactionType.REVENUE, { type = TransactionType.REVENUE }, { Text("Revenu") }) }
+        Column(
+            Modifier.imePadding().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row {
+                FilterChip(
+                    selected = type == TransactionType.EXPENSE,
+                    onClick = {
+                        type = TransactionType.EXPENSE
+                        category = ExpenseCategories.first()
+                    },
+                    label = { Text("Dépense") }
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = type == TransactionType.REVENUE,
+                    onClick = {
+                        type = TransactionType.REVENUE
+                        category = RevenueCategories.first()
+                    },
+                    label = { Text("Revenu") }
+                )
+            }
             OutlinedTextField(label, { label = it }, label = { Text("Libellé") }, singleLine = true)
-            OutlinedTextField(category, { category = it }, label = { Text("Catégorie") }, singleLine = true)
+
+            Text("Catégorie :", style = MaterialTheme.typography.labelMedium)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                currentCategories.forEach { cat ->
+                    FilterChip(
+                        selected = category == cat,
+                        onClick = { category = cat },
+                        label = { Text(cat) }
+                    )
+                }
+            }
+
             OutlinedTextField(amount, { amount = it }, label = { Text("Montant en euros") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
             OutlinedButton(onClick = { showDatePicker = true }) {
                 Text("Date : ${dateFormatter.format(Date(dateMillis))}")
             }
         }
     }, confirmButton = { TextButton(onClick = {
-        val value = amount.replace(',', '.').toDoubleOrNull()
-        if (label.isBlank() || value == null || value <= 0 || dateMillis <= 0) {
+        val amountCents = Money.parseEuroToCents(amount)
+        if (label.isBlank() || amountCents == null || amountCents <= 0L || dateMillis <= 0) {
             error = true
         } else {
-            onAdd(type, category, label, (value * 100).toLong(), dateMillis)
+            onAdd(type, category, label, amountCents, dateMillis)
             onDismiss()
         }
     }) { Text("Ajouter") } }, dismissButton = { TextButton(onDismiss) { Text("Annuler") } })
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = dateMillis)
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = TaskCalculations.localDayToDatePickerMillis(dateMillis),
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { dateMillis = it }
+                    datePickerState.selectedDateMillis?.let {
+                        dateMillis = TaskCalculations.datePickerMillisToLocalDay(it)
+                    }
                     showDatePicker = false
                 }) { Text("Valider") }
             },

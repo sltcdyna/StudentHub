@@ -38,7 +38,7 @@ data class StudiesUiState(
 @HiltViewModel
 class StudiesViewModel @Inject constructor(
     private val repository: TaskRepository,
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val preferences: DataStore<Preferences>,
 ) : ViewModel() {
     private val reminders = preferences.data.map { it[ProfilePreferences.remindersEnabled] ?: false }
@@ -48,7 +48,17 @@ class StudiesViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StudiesUiState())
 
     fun setRemindersEnabled(enabled: Boolean) {
-        viewModelScope.launch { preferences.edit { it[ProfilePreferences.remindersEnabled] = enabled } }
+        viewModelScope.launch(Dispatchers.IO) {
+            preferences.edit { it[ProfilePreferences.remindersEnabled] = enabled }
+            if (!enabled) {
+                WorkManager.getInstance(context).cancelAllWorkByTag(REMINDER_TAG)
+            } else {
+                repository.observeAll().first()
+                    .filterNot(Task::done)
+                    .filter { it.dueDate > System.currentTimeMillis() }
+                    .forEach(::scheduleReminder)
+            }
+        }
     }
 
     fun addTask(type: TaskType, subject: String, title: String, dueDate: Long) = viewModelScope.launch(Dispatchers.IO) {
@@ -60,10 +70,35 @@ class StudiesViewModel @Inject constructor(
         }
     }
 
-    fun setDone(task: Task, done: Boolean) = viewModelScope.launch(Dispatchers.IO) { repository.setDone(task, done) }
+    fun updateTask(task: Task, type: TaskType, subject: String, title: String, dueDate: Long) =
+        viewModelScope.launch(Dispatchers.IO) {
+            if (subject.isBlank() || title.isBlank() || dueDate <= 0L) return@launch
+            val updated = task.copy(type = type, subject = subject.trim(), title = title.trim(), dueDate = dueDate)
+            repository.update(updated)
+            WorkManager.getInstance(context).cancelUniqueWork("task-reminder-${task.id}")
+            if (!updated.done && preferences.data.map { it[ProfilePreferences.remindersEnabled] ?: false }.first()) {
+                scheduleReminder(updated)
+            }
+        }
+
+    fun setDone(task: Task, done: Boolean) = viewModelScope.launch(Dispatchers.IO) {
+        repository.setDone(task, done)
+        if (done) {
+            preferences.edit { it[ProfilePreferences.lastTaskCompletedAt] = System.currentTimeMillis() }
+            WorkManager.getInstance(context).cancelUniqueWork("task-reminder-${task.id}")
+        } else if (preferences.data.map { it[ProfilePreferences.remindersEnabled] ?: false }.first()) {
+            scheduleReminder(task)
+        }
+    }
+
+    fun deleteTask(task: Task) = viewModelScope.launch(Dispatchers.IO) {
+        repository.delete(task)
+        WorkManager.getInstance(context).cancelUniqueWork("task-reminder-${task.id}")
+    }
 
     private fun scheduleReminder(task: Task) {
         val request = OneTimeWorkRequestBuilder<TaskReminderWorker>()
+            .addTag(REMINDER_TAG)
             .setInputData(Data.Builder()
                 .putLong(TaskReminderWorker.KEY_ID, task.id)
                 .putString(TaskReminderWorker.KEY_TITLE, task.title)
@@ -72,5 +107,9 @@ class StudiesViewModel @Inject constructor(
             .setInitialDelay(TaskCalculations.reminderDelay(task.dueDate, System.currentTimeMillis()), TimeUnit.MILLISECONDS)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork("task-reminder-${task.id}", ExistingWorkPolicy.REPLACE, request)
+    }
+
+    private companion object {
+        const val REMINDER_TAG = "studenthub-task-reminder"
     }
 }

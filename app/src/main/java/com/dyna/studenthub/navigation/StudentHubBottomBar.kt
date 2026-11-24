@@ -1,7 +1,6 @@
 package com.dyna.studenthub.navigation
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -11,7 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dyna.studenthub.domain.StudentHubDestination
-import com.dyna.studenthub.ui.theme.StudyBlue
+import androidx.compose.material3.MaterialTheme
 
 @Composable
 fun StudentHubBottomBar(
@@ -19,9 +18,16 @@ fun StudentHubBottomBar(
     onDestinationSelected: (StudentHubDestination) -> Unit,
 ) {
     NavigationBar(
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .98f),
+        tonalElevation = 2.dp,
     ) {
-        StudentHubDestination.entries.filter { it != StudentHubDestination.COURSES }.forEach { destination ->
+        listOf(
+            StudentHubDestination.HOME,
+            StudentHubDestination.STUDIES,
+            StudentHubDestination.MONEY,
+            StudentHubDestination.MEALS,
+            StudentHubDestination.PROFILE,
+        ).forEach { destination ->
             NavigationBarItem(
                 selected = currentRoute == destination.route,
                 onClick = { onDestinationSelected(destination) },
@@ -34,7 +40,11 @@ fun StudentHubBottomBar(
                 },
                 label = { Text(destination.title) },
                 colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = StudyBlue.copy(alpha = 0.14f),
+                    selectedIconColor = MaterialTheme.colorScheme.secondary,
+                    selectedTextColor = MaterialTheme.colorScheme.secondary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                 ),
             )
         }

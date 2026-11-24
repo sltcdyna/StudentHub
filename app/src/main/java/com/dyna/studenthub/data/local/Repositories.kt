@@ -17,6 +17,7 @@ class ProductRepository @Inject constructor(private val dao: ProductDao) {
     fun observeById(id: Long): Flow<Product?> = dao.observeById(id)
     fun insert(value: Product): Long = dao.insert(value)
     fun delete(value: Product): Int = dao.delete(value)
+    fun update(value: Product): Int = dao.update(value)
     fun setChecked(value: Product, checked: Boolean) = dao.setChecked(value.id, checked)
     fun deleteAll() = dao.deleteAll()
 }
@@ -42,6 +43,7 @@ class TaskRepository @Inject constructor(private val dao: TaskDao) {
     fun observeById(id: Long): Flow<Task?> = dao.observeById(id)
     fun insert(value: Task): Long = dao.insert(value)
     fun delete(value: Task): Int = dao.delete(value)
+    fun update(value: Task): Int = dao.update(value)
     fun setDone(value: Task, done: Boolean) = dao.setDone(value.id, done)
     fun deleteAll() = dao.deleteAll()
 }

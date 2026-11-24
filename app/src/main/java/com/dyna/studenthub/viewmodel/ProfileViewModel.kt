@@ -15,6 +15,8 @@ import com.dyna.studenthub.data.local.TransactionRepository
 import com.dyna.studenthub.data.local.TransactionType
 import com.dyna.studenthub.domain.ProfilePreferences
 import com.dyna.studenthub.domain.ProfileValidation
+import com.dyna.studenthub.domain.CompanionAnimal
+import com.dyna.studenthub.domain.StudentHubThemeChoice
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -30,6 +32,9 @@ data class ProfileUiState(
     val savingsGoalCents: Long = 20_000L,
     val limits: Map<String, Long> = ProfilePreferences.defaultLimits,
     val remindersEnabled: Boolean = false,
+    val companionId: String = CompanionAnimal.CAT.id,
+    val companionName: String = "Mochi",
+    val themeId: String = StudentHubThemeChoice.LAVENDER.id,
 )
 
 @HiltViewModel
@@ -40,6 +45,9 @@ class ProfileViewModel @Inject constructor(
     private val tasks: TaskRepository,
 ) : ViewModel() {
     val uiState: StateFlow<ProfileUiState> = preferences.data.map { prefs ->
+        val cId = prefs[ProfilePreferences.companionId] ?: CompanionAnimal.CAT.id
+        val cAnimal = CompanionAnimal.fromId(cId)
+        val cName = prefs[ProfilePreferences.companionName] ?: if (cAnimal == CompanionAnimal.CAT) "Mochi" else cAnimal.label
         ProfileUiState(
             firstName = prefs[ProfilePreferences.firstName].orEmpty(),
             savingsGoalCents = prefs[ProfilePreferences.savingsGoalCents] ?: 20_000L,
@@ -47,6 +55,9 @@ class ProfileViewModel @Inject constructor(
                 prefs[ProfilePreferences.limits.getValue(category)] ?: default
             },
             remindersEnabled = prefs[ProfilePreferences.remindersEnabled] ?: false,
+            companionId = cId,
+            companionName = cName,
+            themeId = prefs[ProfilePreferences.themeId] ?: StudentHubThemeChoice.LAVENDER.id,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProfileUiState())
 
@@ -70,6 +81,14 @@ class ProfileViewModel @Inject constructor(
 
     fun setRemindersEnabled(enabled: Boolean) = viewModelScope.launch {
         preferences.edit { it[ProfilePreferences.remindersEnabled] = enabled }
+    }
+
+    fun saveCustomization(companion: CompanionAnimal, name: String, theme: StudentHubThemeChoice) = viewModelScope.launch {
+        preferences.edit {
+            it[ProfilePreferences.companionId] = companion.id
+            it[ProfilePreferences.companionName] = name.trim().ifBlank { companion.label }
+            it[ProfilePreferences.themeId] = theme.id
+        }
     }
 
     fun resetDemoData() = viewModelScope.launch(Dispatchers.IO) {

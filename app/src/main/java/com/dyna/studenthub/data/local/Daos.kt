@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -23,6 +24,7 @@ interface ProductDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) fun insert(product: Product): Long
     @Insert(onConflict = OnConflictStrategy.REPLACE) fun insertAll(products: List<Product>): List<Long>
     @Delete fun delete(product: Product): Int
+    @Update fun update(product: Product): Int
     @Query("UPDATE products SET checked = :checked WHERE id = :id") fun setChecked(id: Long, checked: Boolean)
     @Query("DELETE FROM products") fun deleteAll()
     @Query("SELECT * FROM products ORDER BY name") fun observeAll(): Flow<List<Product>>
@@ -55,6 +57,7 @@ interface TaskDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) fun insert(task: Task): Long
     @Insert(onConflict = OnConflictStrategy.REPLACE) fun insertAll(tasks: List<Task>): List<Long>
     @Delete fun delete(task: Task): Int
+    @Update fun update(task: Task): Int
     @Query("SELECT * FROM tasks ORDER BY dueDate ASC, subject ASC, title ASC") fun observeAll(): Flow<List<Task>>
     @Query("SELECT * FROM tasks WHERE id = :id") fun observeById(id: Long): Flow<Task?>
     @Query("UPDATE tasks SET done = :done WHERE id = :id") fun setDone(id: Long, done: Boolean)

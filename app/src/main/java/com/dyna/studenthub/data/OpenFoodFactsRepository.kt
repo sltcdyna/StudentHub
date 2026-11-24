@@ -39,21 +39,25 @@ object OpenFoodFactsParser {
 
 class OpenFoodFactsRepository @javax.inject.Inject constructor() {
     suspend fun findProduct(barcode: String): ProductLookupResult = withContext(Dispatchers.IO) {
-        val connection = (URL("https://world.openfoodfacts.org/api/v2/product/$barcode.json")
-            .openConnection() as HttpURLConnection).apply {
-            connectTimeout = 5_000
-            readTimeout = 5_000
-            requestMethod = "GET"
-            setRequestProperty("User-Agent", "StudentHub/1.0 (Android)")
-        }
         try {
-            if (connection.responseCode !in 200..299) {
-                return@withContext ProductLookupResult(barcode, null)
+            val connection = (URL("https://world.openfoodfacts.org/api/v2/product/$barcode.json")
+                .openConnection() as HttpURLConnection).apply {
+                connectTimeout = 5_000
+                readTimeout = 5_000
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "StudentHub/1.0 (Android)")
             }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            ProductLookupResult(barcode, OpenFoodFactsParser.productName(body))
-        } finally {
-            connection.disconnect()
+            try {
+                if (connection.responseCode !in 200..299) {
+                    return@withContext ProductLookupResult(barcode, null)
+                }
+                val body = connection.inputStream.bufferedReader().use { it.readText() }
+                ProductLookupResult(barcode, OpenFoodFactsParser.productName(body))
+            } finally {
+                connection.disconnect()
+            }
+        } catch (e: Exception) {
+            ProductLookupResult(barcode, null)
         }
     }
 }

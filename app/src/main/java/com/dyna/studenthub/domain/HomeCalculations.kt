@@ -3,9 +3,32 @@ package com.dyna.studenthub.domain
 import com.dyna.studenthub.data.local.Task
 import java.util.Calendar
 
+enum class CompanionMood {
+    DEFAULT,
+    HAPPY,
+    ALERT;
+
+    val message: String
+        get() = when (this) {
+            DEFAULT -> "Petit pas, grandes réussites !"
+            HAPPY -> "On est une super team !"
+            ALERT -> "Attention, on est proche de la limite !"
+        }
+}
+
 object HomeCalculations {
     fun objectiveProgress(balanceCents: Long, objectiveCents: Long): Float =
         if (objectiveCents <= 0L) 0f else (balanceCents.toDouble() / objectiveCents).toFloat().coerceIn(0f, 1f)
+
+    fun companionMood(
+        hasExceededCategory: Boolean,
+        balanceCents: Long,
+        savingsGoalCents: Long
+    ): CompanionMood = when {
+        hasExceededCategory -> CompanionMood.ALERT
+        savingsGoalCents > 0L && balanceCents >= savingsGoalCents -> CompanionMood.HAPPY
+        else -> CompanionMood.DEFAULT
+    }
 
     fun tasksWithinNext7Days(tasks: List<Task>, now: Long): List<Task> {
         val start = Calendar.getInstance().apply {
@@ -18,5 +41,16 @@ object HomeCalculations {
         val end = start + 7L * TaskCalculations.DAY_MILLIS
         return tasks.filter { !it.done && it.dueDate >= start && it.dueDate <= end }
             .sortedWith(compareBy<Task> { it.dueDate }.thenBy { it.subject }.thenBy { it.title })
+    }
+
+    fun upcomingTasks(tasks: List<Task>, now: Long): List<Task> {
+        val startOfToday = Calendar.getInstance().apply {
+            timeInMillis = now
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return TaskCalculations.sorted(tasks.filter { !it.done && it.dueDate >= startOfToday })
     }
 }

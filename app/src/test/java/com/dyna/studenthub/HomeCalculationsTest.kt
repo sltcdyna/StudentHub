@@ -2,6 +2,7 @@ package com.dyna.studenthub
 
 import com.dyna.studenthub.data.local.Task
 import com.dyna.studenthub.data.local.TaskType
+import com.dyna.studenthub.domain.CompanionMood
 import com.dyna.studenthub.domain.HomeCalculations
 import com.dyna.studenthub.domain.TaskCalculations
 import org.junit.Assert.assertEquals
@@ -10,6 +11,46 @@ import java.util.Calendar
 import java.util.TimeZone
 
 class HomeCalculationsTest {
+    @Test fun companionMoodAlertWhenCategoryExceedsLimit() {
+        val mood = HomeCalculations.companionMood(
+            hasExceededCategory = true,
+            balanceCents = 30_000L,
+            savingsGoalCents = 20_000L
+        )
+        assertEquals(CompanionMood.ALERT, mood)
+        assertEquals("Attention, on est proche de la limite !", mood.message)
+    }
+
+    @Test fun companionMoodHappyWhenSavingsGoalReached() {
+        val mood = HomeCalculations.companionMood(
+            hasExceededCategory = false,
+            balanceCents = 25_000L,
+            savingsGoalCents = 20_000L
+        )
+        assertEquals(CompanionMood.HAPPY, mood)
+        assertEquals("On est une super team !", mood.message)
+    }
+
+    @Test fun companionMoodDefaultWhenGoalNotReached() {
+        val mood = HomeCalculations.companionMood(
+            hasExceededCategory = false,
+            balanceCents = 10_000L,
+            savingsGoalCents = 20_000L
+        )
+        assertEquals(CompanionMood.DEFAULT, mood)
+        assertEquals("Petit pas, grandes réussites !", mood.message)
+    }
+
+    @Test fun companionMoodDefaultWhenNoSavingsGoalSet() {
+        val mood = HomeCalculations.companionMood(
+            hasExceededCategory = false,
+            balanceCents = 10_000L,
+            savingsGoalCents = 0L
+        )
+        assertEquals(CompanionMood.DEFAULT, mood)
+        assertEquals("Petit pas, grandes réussites !", mood.message)
+    }
+
     @Test fun objectiveProgressIsClampedAndHandlesEmptyGoal() {
         assertEquals(0f, HomeCalculations.objectiveProgress(100, 0))
         assertEquals(1f, HomeCalculations.objectiveProgress(300, 200))

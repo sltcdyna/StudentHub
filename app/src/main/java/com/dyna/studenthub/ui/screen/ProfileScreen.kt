@@ -21,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +35,25 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dyna.studenthub.viewmodel.ProfileViewModel
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
+import com.dyna.studenthub.R
+import com.dyna.studenthub.domain.CompanionAnimal
+import com.dyna.studenthub.domain.StudentHubThemeChoice
+import com.dyna.studenthub.ui.theme.themePreviewColors
+
 @Composable
 fun ProfileScreen(viewModel: ProfileViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsState()
@@ -43,6 +61,9 @@ fun ProfileScreen(viewModel: ProfileViewModel = hiltViewModel()) {
     var name by rememberSaveable(state.firstName) { mutableStateOf(state.firstName) }
     var resetDialog by rememberSaveable { mutableStateOf(false) }
     var validationError by rememberSaveable { mutableStateOf(false) }
+    var selectedCompanion by rememberSaveable(state.companionId) { mutableStateOf(CompanionAnimal.fromId(state.companionId)) }
+    var companionName by rememberSaveable(state.companionName) { mutableStateOf(state.companionName) }
+    var selectedTheme by rememberSaveable(state.themeId) { mutableStateOf(StudentHubThemeChoice.fromId(state.themeId)) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         viewModel.setRemindersEnabled(granted)
     }
@@ -54,12 +75,108 @@ fun ProfileScreen(viewModel: ProfileViewModel = hiltViewModel()) {
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = state.firstName.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
                 Text(
-                    text = state.firstName.firstOrNull()?.uppercase() ?: "?",
+                    state.firstName.ifBlank { "Mon profil" },
                     style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.clip(CircleShape).padding(12.dp),
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
-                Text(state.firstName.ifBlank { "Mon profil" }, style = MaterialTheme.typography.headlineMedium)
+            }
+        }
+        item {
+            ProfileCard("Personnalisation") {
+                Text("Mon compagnon", style = MaterialTheme.typography.titleMedium)
+                Text("Choisis ton animal et donne-lui un prénom.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(CompanionAnimal.entries.size) { index ->
+                        val animal = CompanionAnimal.entries[index]
+                        val imageId = when (animal) {
+                            CompanionAnimal.CAT -> R.drawable.pet_cat
+                            CompanionAnimal.DOG -> R.drawable.pet_dog
+                            CompanionAnimal.RABBIT -> R.drawable.pet_rabbit
+                            CompanionAnimal.FOX -> R.drawable.pet_fox
+                            CompanionAnimal.PANDA -> R.drawable.pet_panda
+                            CompanionAnimal.CAPYBARA -> R.drawable.pet_capybara
+                        }
+                        Card(
+                            modifier = Modifier.width(112.dp).clickable {
+                                val isDefaultName = companionName.isBlank() ||
+                                    companionName == "Mochi" ||
+                                    companionName == selectedCompanion.label ||
+                                    CompanionAnimal.entries.any { it.label == companionName }
+                                val newName = if (isDefaultName) animal.label else companionName
+                                selectedCompanion = animal
+                                companionName = newName
+                                viewModel.saveCustomization(animal, newName, selectedTheme)
+                            },
+                            border = BorderStroke(2.dp, if (selectedCompanion == animal) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        ) {
+                            Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Image(painterResource(imageId), contentDescription = "Illustration du ${animal.label.lowercase()}", modifier = Modifier.size(78.dp), contentScale = ContentScale.Fit)
+                                Text(animal.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                                if (selectedCompanion == animal) {
+                                    Text("Choisi", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = companionName,
+                    onValueChange = { companionName = it.take(20) },
+                    label = { Text("Prénom du compagnon") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
+                        viewModel.saveCustomization(selectedCompanion, companionName, selectedTheme)
+                    }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("Mon thème", style = MaterialTheme.typography.titleMedium)
+                Text("Choisis un thème : il s’applique tout de suite à toute l’application.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(StudentHubThemeChoice.entries.size) { index ->
+                        val theme = StudentHubThemeChoice.entries[index]
+                        val preview = themePreviewColors(theme)
+                        val isSelected = selectedTheme == theme
+                        Card(
+                            modifier = Modifier.width(112.dp).clickable {
+                                selectedTheme = theme
+                                viewModel.saveCustomization(selectedCompanion, companionName, theme)
+                            },
+                            border = BorderStroke(2.dp, if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant),
+                            colors = CardDefaults.cardColors(containerColor = preview.background),
+                        ) {
+                            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Box(Modifier.size(20.dp).background(preview.primary, CircleShape))
+                                    Box(Modifier.size(20.dp).background(preview.accent, CircleShape))
+                                    Box(Modifier.size(20.dp).background(preview.surface, CircleShape))
+                                }
+                                Text(theme.label, color = preview.text, style = MaterialTheme.typography.labelLarge)
+                                if (isSelected) {
+                                    Text("Actif", color = preview.primaryDark, style = MaterialTheme.typography.labelSmall)
+                                }
+                                Box(Modifier.fillMaxWidth().height(4.dp).background(preview.accent, CircleShape))
+                            }
+                        }
+                    }
+                }
+                Button(onClick = { viewModel.saveCustomization(selectedCompanion, companionName, selectedTheme) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Enregistrer le prénom du compagnon")
+                }
             }
         }
         item {
@@ -131,7 +248,7 @@ fun ProfileScreen(viewModel: ProfileViewModel = hiltViewModel()) {
 
 @Composable
 private fun ProfileCard(title: String, content: @Composable () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge)
             content()

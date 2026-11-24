@@ -14,10 +14,23 @@ import com.dyna.studenthub.data.RecipeCatalogLoader
 import dagger.hilt.android.HiltAndroidApp
 import java.util.concurrent.Executors
 import javax.inject.Inject
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.disk.DiskCache
 
 @HiltAndroidApp
-class StudentHubApplication : Application() {
+class StudentHubApplication : Application(), ImageLoaderFactory {
     @Inject lateinit var database: AppDatabase
+
+    override fun newImageLoader(): ImageLoader = ImageLoader.Builder(this)
+        .crossfade(true)
+        .diskCache {
+            DiskCache.Builder()
+                .directory(cacheDir.resolve("meal_photos"))
+                .maxSizeBytes(64L * 1024L * 1024L)
+                .build()
+        }
+        .build()
 
     override fun onCreate() {
         super.onCreate()

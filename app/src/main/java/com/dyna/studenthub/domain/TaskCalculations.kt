@@ -18,4 +18,12 @@ object TaskCalculations {
             set(utc.get(Calendar.YEAR), utc.get(Calendar.MONTH), utc.get(Calendar.DAY_OF_MONTH))
         }.timeInMillis
     }
+
+    fun localDayToDatePickerMillis(value: Long): Long {
+        val local = Calendar.getInstance().apply { timeInMillis = value }
+        return Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            clear()
+            set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
+        }.timeInMillis
+    }
 }

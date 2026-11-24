@@ -2,8 +2,10 @@ package com.dyna.studenthub
 
 import com.dyna.studenthub.data.local.Transaction
 import com.dyna.studenthub.data.local.TransactionType
+import com.dyna.studenthub.domain.Money
 import com.dyna.studenthub.domain.MoneyCalculations
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,5 +23,20 @@ class MoneyCalculationsTest {
 
     @Test fun alertStartsAtEightyPercentOfLimit() {
         assertTrue("Alimentation" in MoneyCalculations.exceededCategories(listOf(tx(TransactionType.EXPENSE, 8_000)), mapOf("Alimentation" to 10_000)))
+    }
+
+    @Test fun remainingWeeksInMonthReturnsPositiveValue() {
+        assertTrue(MoneyCalculations.remainingWeeksInMonth() >= 1.0)
+    }
+
+    @Test fun euroAmountsAreConvertedToExactCents() {
+        assertEquals(115L, Money.parseEuroToCents("1,15"))
+        assertEquals(1L, Money.parseEuroToCents("0.01"))
+    }
+
+    @Test fun amountsThatCannotBeRepresentedInCentsAreRejected() {
+        assertNull(Money.parseEuroToCents("1.001"))
+        assertNull(Money.parseEuroToCents("-1"))
+        assertNull(Money.parseEuroToCents("999999999999999999999999"))
     }
 }

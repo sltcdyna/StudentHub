@@ -23,7 +23,7 @@ android {
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
             }
         }
     }
@@ -45,6 +45,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
@@ -63,7 +64,6 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.compose.material.icons.extended)
-    implementation(libs.androidx.compose.ui.text.google.fonts)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.core)

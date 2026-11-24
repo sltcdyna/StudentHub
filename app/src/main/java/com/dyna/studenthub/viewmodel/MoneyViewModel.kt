@@ -32,14 +32,16 @@ class MoneyViewModel @Inject constructor(
     preferences: DataStore<Preferences>,
 ) : ViewModel() {
     val uiState: StateFlow<MoneyUiState> = kotlinx.coroutines.flow.combine(repository.observeAll(), preferences.data) { values, prefs ->
-        val expenses = values.filter { it.type == TransactionType.EXPENSE }
+        val monthTransactions = MoneyCalculations.currentMonthTransactions(values)
+        val expenses = monthTransactions.filter { it.type == TransactionType.EXPENSE }
+        val monthBalance = MoneyCalculations.balance(monthTransactions)
         val limits = ProfilePreferences.defaultLimits.mapValues { (category, default) ->
             prefs[ProfilePreferences.limits.getValue(category)] ?: default
         }
         MoneyUiState(
             transactions = values,
-            balanceCents = MoneyCalculations.balance(values),
-            weeklyBudgetCents = MoneyCalculations.weeklyBudget(MoneyCalculations.balance(values)),
+            balanceCents = monthBalance,
+            weeklyBudgetCents = MoneyCalculations.weeklyBudget(monthBalance, MoneyCalculations.remainingWeeksInMonth()),
             exceededCategories = MoneyCalculations.exceededCategories(expenses, limits),
             categoryTotals = expenses.groupBy { it.category }.mapValues { it.value.sumOf(Transaction::amountCents) },
         )
@@ -50,6 +52,10 @@ class MoneyViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             repository.insert(Transaction(type = type, category = category, label = label, amountCents = amountCents, date = date))
         }
+    }
+
+    fun deleteTransaction(transaction: Transaction) = viewModelScope.launch(Dispatchers.IO) {
+        repository.delete(transaction)
     }
 
     companion object {
